@@ -11,8 +11,10 @@ from ks_convergence.helpers import value_to_closest_index
 from ks_convergence.plot import create_figure, add_axis_to_figure
 from ks_convergence.scheduler import scheduler
 from block_averaging.block_averaged_error_estimate import estimate_error
+
 TEST_DATA = ["large_data_set.dat","not_converged_test.dat","converged_test.dat", "converged_test_2.dat"]
 ACF_TRUNCATION = 0.05 # keep 20% of data
+
 def sloppy_data_parser(file_name):
     with open(file_name) as fh:
         xs, ys = zip(*[map(float, l.split()) for l in fh.read().splitlines() if l and not l[0] in ["#", "@"] and len(l.split()) == 2])
@@ -134,7 +136,7 @@ def autocorrelation_function(y):
     return result
 
 def run_real_data():
-    data_portion = 0.5
+    data_portion = 1
     for data_path in TEST_DATA:
         print "Processing: " + data_path
         x_all, y_all = sloppy_data_parser(data_path)
@@ -158,6 +160,7 @@ def run_real_data():
         ks_error_est = 2.0*np.std(y)*np.array(ks_vals)
         plot_against_region_size(test_region_sizes, ks_error_est, errors, os.path.basename(data_path)[:-4])
         plot_correlation(ks_error_est, errors, os.path.basename(data_path)[:-4] + "_")
+        print "Error estimate: {0} (over {1})".format(ks_error_est[-1], test_region_sizes[-1])
 
 def run_dummy_data():
     N = 50000 # frames

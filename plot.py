@@ -1,8 +1,8 @@
 from os.path import dirname
 import os
+
 import matplotlib
-if not os.environ.has_key("DISPLAY"):
-    matplotlib.use("Agg")
+matplotlib.use("Agg")
 import pylab
 #matplotlib.rc('font', family='serif')
 matplotlib.rc('font', serif='Arial')
@@ -142,4 +142,4 @@ if __name__=="__main__":
     fig = create_figure((8,7))
     ax = add_axis_to_figure(fig)
     plot(ax, [0,1], [0,1], xlabel="x", ylabel="y", label="test", line_color="g", symbol="o", linewidth=2, axis_line_width=1.5, tick_width=1.2, font_size=14)
-    pylab.show()
+    save_figure(fig, "test", image_format="png")
