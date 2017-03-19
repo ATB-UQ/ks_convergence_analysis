@@ -224,5 +224,5 @@ def run_dummy_data():
 
 
 if __name__=="__main__":
-    #run_dummy_data()
-    run_real_data()
+    run_dummy_data()
+    #run_real_data()

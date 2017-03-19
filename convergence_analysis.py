@@ -48,7 +48,7 @@ def run_ks_2samp_for_all(region_indexes, y, multithread=False):
         ks_values = [ks_test(y[-test_region_len:]) for test_region_len in region_indexes]
     return ks_values
 
-def ks_convergence_analysis(x, y, convergence_criteria=0.5, step_size_in_percent=1):
+def ks_convergence_analysis(x, y, convergence_criteria, step_size_in_percent=1, nsigma=2):
 
     step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
     step_index = value_to_closest_index(x, step_size)
@@ -56,7 +56,8 @@ def ks_convergence_analysis(x, y, convergence_criteria=0.5, step_size_in_percent
         raise Exception("StepIndex = 0, this will cause infinite loop.")
 
     test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index)
-    ks_error_est = 2.0*np.std(y)*np.array(ks_vals)
+    ks_error_est = nsigma*np.std(y)*np.array(ks_vals)
+
     converged_blocks, block_min_ks_values = find_converged_blocks(test_region_sizes, ks_error_est, convergence_criteria, step_size)
     if converged_blocks:
         largest_converged_block, largest_converged_block_minimum_ks_err\
@@ -81,7 +82,7 @@ def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_
     ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="k",marker ='o')
     ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
     ax_ks.set_ylabel("KS error estimate")
-    ax_ks.set_xlabel("End anchored region size")
+    ax_ks.set_xlabel("Test region size")
 
     ax_summary.plot(x, y, color="k",alpha=.5)
 
