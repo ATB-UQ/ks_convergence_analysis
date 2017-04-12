@@ -4,7 +4,7 @@ import numpy as np
 
 sys.path.append("../../")
 from ks_convergence.convergence_analysis import ks_convergence_analysis
-from mspyplot.plot import save_figure, plot
+from mspyplot.plot import plot, save_figure
 from red_noise import red_noise
 
 TEST_DATA = ["large_data_set.dat", "not_converged_test.dat", "converged_test.dat", "converged_test_2.dat"]

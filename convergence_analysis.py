@@ -1,10 +1,10 @@
 from scipy.stats.stats import ks_2samp
 import numpy as np
 from ks_convergence.helpers import value_to_closest_index
-from ks_convergence.plot import create_figure, add_axis_to_figure
+from mspyplot.plot import create_figure, add_axis_to_figure
 from ks_convergence.scheduler import scheduler
 
-def find_converged_blocks(test_region_sizes, ks_error_estimates, convergence_criteria, step_size):
+def find_converged_blocks(test_region_sizes, ks_error_estimates, convergence_criteria, step_size, equilibration_region_tolerance):
     def is_converged(x):
         return x < convergence_criteria
 
@@ -23,11 +23,25 @@ def find_converged_blocks(test_region_sizes, ks_error_estimates, convergence_cri
     converged_blocks = [zip(*block) for block in converged_blocks]
 
     converged_block_bounds = []
-    min_ks_err_est = []
+    min_ks = []
     for block_ks_vals, block_test_region_sizes in converged_blocks:
-        converged_block_bounds.append( (block_test_region_sizes[0], block_test_region_sizes[-1]) )
-        min_ks_err_est.append( np.min(block_ks_vals) )
-    return converged_block_bounds, min_ks_err_est
+        min_ks_value, min_ks_region_size = find_min_point(block_ks_vals, block_test_region_sizes, convergence_criteria*equilibration_region_tolerance)
+        min_ks.append(min_ks_value)
+        converged_block_bounds.append( (block_test_region_sizes[0], min_ks_region_size) )
+    return converged_block_bounds, min_ks
+
+def find_min_point(block_ks_vals, block_test_region_sizes, value_discretisation):
+    # Eue to the noise and flatness of curve values will be sorted based on
+    # discrete bound determined by the value_discretisation variable.
+    # i.e. from 0, steps with increment value_discretisation will be used to
+    # discretize block_ks_vals when sorting. Then secondary sort is on distance
+    # to the largest region size.
+    def sort_func(x):
+        if value_discretisation==0:
+            return (x[0], block_test_region_sizes[-1]-x[1])
+        return int(x[0]/value_discretisation)*value_discretisation, block_test_region_sizes[-1]-x[1]
+
+    return sorted(zip(block_ks_vals, block_test_region_sizes), key=sort_func)[0]
 
 def test_multiple_regions(x, y, step_index):
     # length of test regions, ensure all value are considered by starting from len(x)
@@ -48,7 +62,7 @@ def run_ks_2samp_for_all(region_indexes, y, multithread=False):
         ks_values = [ks_test(y[-test_region_len:]) for test_region_len in region_indexes]
     return ks_values
 
-def ks_convergence_analysis(x, y, convergence_criteria, step_size_in_percent=1, nsigma=2):
+def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=2, equilibration_region_tolerance=0.3):
 
     step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
     step_index = value_to_closest_index(x, step_size)
@@ -56,26 +70,34 @@ def ks_convergence_analysis(x, y, convergence_criteria, step_size_in_percent=1, 
         raise Exception("StepIndex = 0, this will cause infinite loop.")
 
     test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index)
-    ks_error_est = nsigma*np.std(y)*np.array(ks_vals)
+    ks_error_estimates = nsigma*np.std(y)*np.array(ks_vals)
 
-    converged_blocks, block_min_ks_values = find_converged_blocks(test_region_sizes, ks_error_est, convergence_criteria, step_size)
+    converged_blocks, block_min_ks = find_converged_blocks(
+        test_region_sizes,
+        ks_error_estimates,
+        converged_error_threshold,
+        step_size,
+        equilibration_region_tolerance,
+        )
+
     if converged_blocks:
-        largest_converged_block, largest_converged_block_minimum_ks_err\
-            = sorted(zip(converged_blocks, block_min_ks_values), key=lambda x: x[0][1] - x[0][0])[-1]
+        largest_converged_block, largest_converged_block_minimum_ks\
+            = sorted(zip(converged_blocks, block_min_ks), key=lambda x: x[0][1] - x[0][0])[-1]
         minimum_sampling_time = largest_converged_block[0]
         equilibration_time = x[-1] - largest_converged_block[1]
+        ks_err_est = largest_converged_block_minimum_ks
     else:
-        minimum_sampling_time = 0
+        minimum_sampling_time = float("inf")
         equilibration_time = x[-1]
-        largest_converged_block_minimum_ks_err = np.min(ks_error_est)
+        ks_err_est = np.min(ks_error_estimates)
 
-    fig = create_figure()
+    fig = create_figure(figsize=(5, 6))
     ax_ks = add_axis_to_figure(fig, 211)
     ax_summary = add_axis_to_figure(fig, 212, sharex=ax_ks)
 
-    plot_figure(x, y, test_region_sizes, ks_error_est, equilibration_time, minimum_sampling_time, convergence_criteria, step_size_in_percent, ax_ks, ax_summary)
+    plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
 
-    return minimum_sampling_time, equilibration_time, largest_converged_block_minimum_ks_err, fig
+    return minimum_sampling_time, equilibration_time, ks_err_est, fig
 
 def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary):
 
