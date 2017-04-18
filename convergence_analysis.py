@@ -88,8 +88,8 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
         ks_err_est = largest_converged_block_minimum_ks
     else:
         minimum_sampling_time = float("inf")
-        equilibration_time = x[-1]
-        ks_err_est = np.min(ks_error_estimates)
+        equilibration_time = float("inf")
+        ks_err_est = ks_error_estimates[-1]
 
     fig = create_figure(figsize=(5, 6))
     ax_ks = add_axis_to_figure(fig, 211)
@@ -107,11 +107,6 @@ def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_
     ax_ks.set_xlabel("Test region size")
 
     ax_summary.plot(x, y, color="k",alpha=.5)
-
-    # plot minimum sampling region
-    minimum_sampling_region_left_bound = value_to_closest_index(x, x[-1] - minimum_sampling_time)
-    block_mean_y = np.mean(y[minimum_sampling_region_left_bound:])
-    ax_summary.errorbar([x[-1] - minimum_sampling_time/2.], [block_mean_y], xerr=[minimum_sampling_time/2.], color ="g", marker ='o', linestyle='', zorder=4, linewidth=2)
 
     # plot equilibration region
     equilibration_time_right_bound = value_to_closest_index(x, equilibration_time)
