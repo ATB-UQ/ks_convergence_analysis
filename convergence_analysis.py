@@ -100,7 +100,7 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
 
     return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, fig
 
-def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary):
+def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False):
 
     ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="k",marker ='o', markersize=4)
     ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
@@ -108,15 +108,15 @@ def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_
     ax_ks.set_xlabel("Test region size")
 
     ax_summary.plot(x, y, color="k",alpha=.5)
+    if show_analysis:
+        # plot equilibration region
+        equilibration_time_right_bound = value_to_closest_index(x, equilibration_time)
+        equilibration_region_mean = np.mean(y[:equilibration_time_right_bound])
+        ax_summary.errorbar([equilibration_time/2.0],[equilibration_region_mean], xerr=[equilibration_time/2.0], color ="r", marker ='o', linestyle='', zorder=4, linewidth=2)
 
-    # plot equilibration region
-    equilibration_time_right_bound = value_to_closest_index(x, equilibration_time)
-    equilibration_region_mean = np.mean(y[:equilibration_time_right_bound])
-    ax_summary.errorbar([equilibration_time/2.0],[equilibration_region_mean], xerr=[equilibration_time/2.0], color ="r", marker ='o', linestyle='', zorder=4, linewidth=2)
-
-    # plot equilibrated_region
-    equilibrated_region_mean = np.mean(y[equilibration_time_right_bound:])
-    ax_summary.errorbar([x[-1] - (x[-1] - equilibration_time)/2.0], [equilibrated_region_mean], xerr=[(x[-1] - equilibration_time)/2.0], color="b", marker ='o', linestyle='', zorder=3, linewidth=2)
+        # plot equilibrated_region
+        equilibrated_region_mean = np.mean(y[equilibration_time_right_bound:])
+        ax_summary.errorbar([x[-1] - (x[-1] - equilibration_time)/2.0], [equilibrated_region_mean], xerr=[(x[-1] - equilibration_time)/2.0], color="b", marker ='o', linestyle='', zorder=3, linewidth=2)
 
     ax_summary.set_ylabel("y")
     ax_summary.set_xlabel("x")

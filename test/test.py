@@ -19,27 +19,31 @@ def test_red_noise():
     nsigma=1
     N = 50000 # frames
     dt = 0.020 # time between frames ps
-    tau = 5 # correlation constant ps
+    tau = 1 # correlation constant ps
     tau_discrete = tau/dt
 
-    sigma = 30
-    mean = 0
-    print "Processing red noise: tau={0}, sigma={1}".format(tau_discrete, sigma)
-    y = red_noise.generate_from_tau(N, sigma, mean, tau_discrete)
-    x = np.arange(N)
 
-    fig = run(x, y, nsigma=nsigma)
-    print "True error: {0:.3f}".format(abs(mean-np.mean(y)))
+    sigma = 5
+    mean = 100
+    fig, x, y = error_est_red_noise(N, dt, sigma, mean, tau_discrete)
+
     ax = fig.get_axes()[0]
     se_error_est = nsigma*sigma*np.sqrt(tau_discrete/x)
     plot(ax, x[100:], se_error_est[100:], symbol="", linewidth=1, color="b")
-    plot(ax, x[100:], [np.abs(np.mean(y[:101+i])) for i in range(len(x[100:]))], symbol="", linewidth=1, color="g")
+    plot(ax, x[100:], [np.abs(np.mean(np.array(y[:101+i])-mean)) for i in range(len(x[100:]))], symbol="", linewidth=1, color="g")
     fig.tight_layout()
     save_figure(fig, "red_noise")
+
+def error_est_red_noise(N, dt, sigma, mean, tau_discrete):
+    print "Processing red noise: tau_discrete={0}, sigma={1}".format(tau_discrete, sigma)
+    y = red_noise.generate_from_tau(N, sigma, mean, tau_discrete)
+    x = np.arange(N)
+    return run(x, y), x, y
 
 def run(x, y, name=None, nsigma=1):
     minimum_sampling_time, equilibration_time, largest_converged_block_minimum_ks_err, entire_enseble_error_est, fig = \
         ks_convergence_analysis(x, y, TARGET_ERROR, nsigma=nsigma)
+
     if name is not None:
         fig.tight_layout()
         save_figure(fig, name)
@@ -61,8 +65,8 @@ def real_data_tests():
         run(x, y, os.path.basename(data_path)[:-4])
 
 def run_all():
-    #test_red_noise()
-    real_data_tests()
+    test_red_noise()
+    #real_data_tests()
 
 if __name__=="__main__":
     run_all()
