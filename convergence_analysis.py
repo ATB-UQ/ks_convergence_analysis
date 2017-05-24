@@ -43,13 +43,13 @@ def find_min_point(block_ks_vals, block_test_region_sizes, value_discretisation)
 
     return sorted(zip(block_ks_vals, block_test_region_sizes), key=sort_func)[0]
 
-def test_multiple_regions(x, y, step_index):
+def test_multiple_regions(x, y, step_index, multithread):
     # length of test regions, ensure all value are considered by starting from len(x)
     region_indexes = np.arange(len(x), 0, -step_index)[::-1]
     # convert indexes into x values
     test_region_sizes = [(x[-1] - x[-test_region_len]) for test_region_len in region_indexes]
     # perform ks test on first and 2nd halves of each region
-    ks_vals = run_ks_2samp_for_all(region_indexes, y, multithread=True)
+    ks_vals = run_ks_2samp_for_all(region_indexes, y, multithread=multithread)
 
     return test_region_sizes, ks_vals
 
@@ -62,14 +62,14 @@ def run_ks_2samp_for_all(region_indexes, y, multithread=False):
         ks_values = [ks_test(y[-test_region_len:]) for test_region_len in region_indexes]
     return ks_values
 
-def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1, equilibration_region_tolerance=0.3):
+def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1, equilibration_region_tolerance=0.3, multithread=True, produce_figure=True):
 
     step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
     step_index = value_to_closest_index(x, step_size)
     if step_index == 0:
         raise Exception("StepIndex = 0, this will cause infinite loop.")
 
-    test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index)
+    test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index, multithread)
     ks_error_estimates = nsigma*np.std(y)*np.array(ks_vals)
     entire_enseble_error_est = ks_error_estimates[-1]
 
@@ -92,11 +92,14 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
         equilibration_time = float("inf")
         ks_err_est = entire_enseble_error_est
 
-    fig = create_figure(figsize=(5, 6))
-    ax_ks = add_axis_to_figure(fig, 211)
-    ax_summary = add_axis_to_figure(fig, 212, sharex=ax_ks)
+    if produce_figure:
+        fig = create_figure(figsize=(5, 6))
+        ax_ks = add_axis_to_figure(fig, 211)
+        ax_summary = add_axis_to_figure(fig, 212, sharex=ax_ks)
 
-    plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
+        plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
+    else:
+        fig = None
 
     return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, fig
 
