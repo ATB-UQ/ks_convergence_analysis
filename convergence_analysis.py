@@ -62,7 +62,7 @@ def run_ks_2samp_for_all(region_indexes, y, multithread=False):
         ks_values = [ks_test(y[-test_region_len:]) for test_region_len in region_indexes]
     return ks_values
 
-def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=2, equilibration_region_tolerance=0.3):
+def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1, equilibration_region_tolerance=0.3):
 
     step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
     step_index = value_to_closest_index(x, step_size)
@@ -71,6 +71,7 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
 
     test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index)
     ks_error_estimates = nsigma*np.std(y)*np.array(ks_vals)
+    entire_enseble_error_est = ks_error_estimates[-1]
 
     converged_blocks, block_min_ks = find_converged_blocks(
         test_region_sizes,
@@ -89,7 +90,7 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
     else:
         minimum_sampling_time = float("inf")
         equilibration_time = float("inf")
-        ks_err_est = ks_error_estimates[-1]
+        ks_err_est = entire_enseble_error_est
 
     fig = create_figure(figsize=(5, 6))
     ax_ks = add_axis_to_figure(fig, 211)
@@ -97,11 +98,11 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
 
     plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
 
-    return minimum_sampling_time, equilibration_time, ks_err_est, fig
+    return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, fig
 
 def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary):
 
-    ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="k",marker ='o')
+    ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="k",marker ='o', markersize=4)
     ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
     ax_ks.set_ylabel("KS error estimate")
     ax_ks.set_xlabel("Test region size")
