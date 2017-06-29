@@ -66,7 +66,7 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
     equilibration_region_tolerance=0.3, multithread=True, produce_figure=True):
 
     step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
-    step_index = value_to_closest_index(x, step_size)
+    step_index = value_to_closest_index(x, x[0]+step_size)
     if step_index == 0:
         raise Exception("StepIndex = 0, this will cause infinite loop.")
 

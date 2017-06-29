@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import pickle
 
 sys.path.append("../../")
 from scheduler import scheduler
@@ -10,7 +11,7 @@ from red_noise import red_noise
 import matplotlib
 cmap = matplotlib.cm.get_cmap('jet')
 
-TEST_DATA = ["dvdl.dat",]#"large_data_set.dat", "not_converged_test.dat", "converged_test.dat", "converged_test_2.dat"]
+TEST_DATA = ["large_data_set.dat", "not_converged_test.dat", "converged_test.dat", "converged_test_2.dat"]
 TARGET_ERROR = 1
 
 def sloppy_data_parser(file_name):
@@ -137,11 +138,10 @@ def run(x, y, name=None, nsigma=1):
     print " Truncated KS error estimate: {0:5.3g} kJ/mol".format(largest_converged_block_minimum_ks_err)
     return fig
 
-def real_data_tests():
-    for data_path in TEST_DATA:
-        print "Processing: {0}".format(data_path)
-        x, y = sloppy_data_parser(data_path)
-        run(x, y, os.path.basename(data_path)[:-4])
+def closer_look():
+
+    x, y = sloppy_data_parser("slow_drift.dat")
+    run(x, y, os.path.basename("slow_drift")[:-4])
     fig = create_figure(figsize=(5,4))
     ax = add_axis_to_figure(fig)
     N = 11000
@@ -151,10 +151,62 @@ def real_data_tests():
     fig.tight_layout()
     save_figure(fig, "closer_look")
 
+
+def run_real_data_test(x, y, name=None, nsigma=1, test_portion=0.1, truncate=0.1):
+    n_truncate = int(len(x)*truncate)
+    n_test_samples = int(len(x)*test_portion)
+    minimum_sampling_time, equilibration_time, largest_converged_block_minimum_ks_err, entire_enseble_error_est, fig = \
+        ks_convergence_analysis(x[n_truncate:n_truncate+n_test_samples], y[n_truncate:n_truncate+n_test_samples], TARGET_ERROR, nsigma=nsigma)
+    reference_value = abs(np.mean(y[n_truncate+n_test_samples:] - np.mean(y[n_truncate:n_truncate+n_test_samples])))
+    if name is not None:
+        fig.tight_layout()
+        save_figure(fig, name)
+    print " Equilibration time: {0:5.1f} ps".format(equilibration_time)
+    print " Minimum sampling time: {0:5.1f} ps".format(minimum_sampling_time)
+    equilibrium_sampling_length = x[-1] - equilibration_time
+    print " Equilibrium sampling length: {0:5.1f} ps".format(equilibrium_sampling_length)
+    print " Equilibrated region: {0:5.1f}-->{1:5.1f} ps".format(equilibration_time, x[-1])
+    print " Convergence robustness: {0:5.3f}".format(equilibrium_sampling_length / minimum_sampling_time)
+    print " Entire ensemble KS error estimate: {0:5.3g} kJ/mol".format(entire_enseble_error_est)
+    print " Truncated KS error estimate: {0:5.3g} kJ/mol".format(largest_converged_block_minimum_ks_err)
+    print "{0:5.3g} ({1:5.3g}) kJ/mol".format(entire_enseble_error_est, reference_value)
+    return entire_enseble_error_est, reference_value
+
+def real_data_tests(sigma):
+    cache_file = "simga{0}_real_test_results.pickle".format(sigma)
+    if os.path.exists(cache_file):
+        with open(cache_file) as fh:
+            return pickle.load(fh)
+    results = []
+    for data_path in os.listdir("data"):
+        print "Processing: {0}".format(data_path)
+        x, y = sloppy_data_parser("data/"+data_path)
+        results.append(run_real_data_test(x, y, os.path.basename(data_path)[:-4], nsigma=sigma))
+    with open(cache_file, "w") as fh:
+        pickle.dump(results, fh)
+    return results
+
+def analyse_real_test_results(results, sigma):
+    diffs = [se-ref for se, ref in results]
+    print diffs
+    print "n cases: {0}".format(len(diffs))
+    print "n error: {0}".format(sum([1 for d in diffs if d < 0]))
+    print "mean diff: {0}".format(np.mean(diffs))
+    print "mean abs diff: {0}".format(np.mean(np.abs(diffs)))
+    print "rmsd: {0}".format(np.sqrt(np.mean([d**2 for d in diffs])))
+    fig = create_figure(figsize=(5,4))
+    ax = add_axis_to_figure(fig)
+    error_ests, refs = zip(*results)
+    plot(ax, refs, error_ests, line_style="", symbol="o")
+    fig.tight_layout()
+    save_figure(fig, "sigma{0}".format(sigma))
+
 def run_all():
     #test_red_noise()
     #extended_red_noise_test()
-    real_data_tests()
+    for sigma in [1,2]:
+        results = real_data_tests(sigma)
+        analyse_real_test_results(results, sigma)
 
 if __name__=="__main__":
     run_all()
