@@ -3,6 +3,7 @@ import numpy as np
 from ks_convergence.helpers import value_to_closest_index
 from mspyplot.plot import create_figure, add_axis_to_figure
 from ks_convergence.scheduler import scheduler
+from matplotlib.gridspec import GridSpec
 
 def find_converged_blocks(test_region_sizes, ks_error_estimates, convergence_criteria, step_size, equilibration_region_tolerance):
     def is_converged(x):
@@ -63,8 +64,8 @@ def run_ks_2samp_for_all(region_indexes, y, multithread=False):
     return ks_values
 
 def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1,
-    equilibration_region_tolerance=0.3, multithread=True, produce_figure=True):
-
+    equilibration_region_tolerance=0.3, multithread=True, produce_figure=True, axes=None):
+    equilibration_region_tolerance = converged_error_threshold
     step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
     step_index = value_to_closest_index(x, x[0]+step_size)
     if step_index == 0:
@@ -93,25 +94,35 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
         equilibration_time = float("inf")
         ks_err_est = entire_enseble_error_est
 
-    if produce_figure:
-        fig = create_figure(figsize=(5, 6))
-        ax_ks = add_axis_to_figure(fig, 211)
-        ax_summary = add_axis_to_figure(fig, 212, sharex=ax_ks)
-
-        plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
+    if produce_figure and axes is None:
+        fig = create_figure(figsize=(3.5, 4.0))
+        gs = GridSpec(3, 1)
+        ax_summary = fig.add_subplot(gs[0,0])#add_axis_to_figure(fig, 212, sharex=ax_ks)
+        ax_ks = fig.add_subplot(gs[1:3,0])#add_axis_to_figure(fig, 211)
     else:
         fig = None
+        ax_ks = None
+        ax_summary = None
+
+    if axes is not None:
+        assert len(axes) == 2, "A list of two axes must be provided"
+        ax_summary, ax_ks = axes
+
+    if ax_ks is not None and ax_summary is not None:
+        plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
 
     return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, fig
 
 def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False):
 
-    ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="k",marker ='o', markersize=4, label="K-S Error")
-    ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
-    ax_ks.set_ylabel("error")
-    ax_ks.set_xlabel("N")
+    ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="b",marker ='', markersize=4, label="$KS_{SE}$", linewidth=1.2)
+    #ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
+    ax_ks.set_ylabel("$KS_{SE}\mathrm{\ (kJ\ mol^{-1})}$")
+    ax_ks.set_xlabel("$\Delta t$ (ps)")
+    #ax_ks.set_xlabel("N")
 
-    ax_summary.plot(x, y, color="k",alpha=.5)
+    ax_summary.plot(x, y, color="k", alpha=1)
+
     if show_analysis:
         # plot equilibration region
         equilibration_time_right_bound = value_to_closest_index(x, equilibration_time)
@@ -122,9 +133,10 @@ def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_
         equilibrated_region_mean = np.mean(y[equilibration_time_right_bound:])
         ax_summary.errorbar([x[-1] - (x[-1] - equilibration_time)/2.0], [equilibrated_region_mean], xerr=[(x[-1] - equilibration_time)/2.0], color="b", marker ='o', linestyle='', zorder=3, linewidth=2)
 
-    ax_summary.set_ylabel("y")
-    ax_summary.set_xlabel("x")
-    ax_summary.set_xlim(0)
+    ax_summary.set_ylabel("$\partial V/\partial \lambda$")
+    ax_summary.set_xlabel("$t$ (ps)")
+    ax_summary.set_xlim((0, max(x)))
+    ax_ks.set_xlim((0,max(x)))
 
 def ks_test(x):
     test_values, ref_values = x[:len(x)/2], x[len(x)/2:]
