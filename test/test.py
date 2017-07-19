@@ -213,7 +213,7 @@ def run(x, y, name=None, nsigma=1, axes=None, target_error=TARGET_ERROR):
     print " Truncated KS error estimate: {0:5.3g} kJ/mol".format(largest_converged_block_minimum_ks_err)
     return equilibration_time, minimum_sampling_time, fig
 
-def equilibration_examples():
+def equilibration_examples(data_file):
     fig = create_figure(figsize=(6,4))
 
     gs = GridSpec(3, 2)
@@ -226,24 +226,23 @@ def equilibration_examples():
     ax_summary_d = fig.add_subplot(gs[0,1])
     ax_ks_d = fig.add_subplot(gs[1:3,1])
 
-    x_d, y_d = sloppy_data_parser("slow_drift.dat")
-    #data_path = "7233_dvdl.dat"
-    #x_d, y_d = sloppy_data_parser(data_path)
-    run(x_d[:15000], y_d[:15000], name="slow_drift", axes=[ax_summary_d, ax_ks_d])
+
+    x_d, y_d = sloppy_data_parser(data_file)
+    run(x_d, y_d, name="slow_drift", axes=[ax_summary_d, ax_ks_d])
     ax_ks_d.set_ylabel("")
     ax_summary_d.set_ylabel("")
     ax_ks_d.invert_xaxis()
     fig.tight_layout()
     save_figure(fig, "equilibration_examples")
 
-    block=500
+    block=5000
     N = len(x_d)
     fig = create_figure(figsize=(6.5, 3))
     ax1 = add_axis_to_figure(fig, "121")
     ax2 = add_axis_to_figure(fig, "122")
     plot(ax1, x_d[:N], y_d[:N], alpha=0.5)
-
-    plot(ax1, x_d[:N-block], [np.mean(y_d[i:block+i]) for i in range(len(y_d[:N])-block)], color="r")
+    mid_block = block/2
+    plot(ax1, [x_d[mid_block + i] for i in range(len(y_d[:N])-block)], [np.mean(y_d[i:block+i]) for i in range(len(y_d[:N])-block)], color="r")
     plot(ax2, x_d[:N-block], [np.mean(y_d[i:block+i]) for i in range(len(y_d[:N])-block)], color="r")
     ax1.set_ylabel("$\partial V/\partial \lambda\mathrm{\ (kJ\ mol^{-1})}$")
     ax1.set_xlim((0, max(x_d[:N])))
@@ -374,12 +373,12 @@ def run_all():
     #red_noise_examples()
     #distribution_analysis()
     #extended_red_noise_test()
-    equilibration_examples()
+    data_path = "/mddata3/atb/solvation_fe_data/ti_920_7113_TI_H2O/ti_920_7113_TI_H2O/TI_H2O/dvdl_H2O_0.875/ene_ana/dvdl.dat"
+    equilibration_examples(data_path)
     #convergence_heuristic()
     #horizontal(["red_noise_2D_true.png", "red_noise_2D_ks.png", "../../block_averaging/test/red_noise_2D.png"],
     #    "combined_2D_red_noise.png")
-    real_data()
-    data_path = "14_dvdl.dat"
+    #real_data()
     x, y = sloppy_data_parser(data_path)
     run_real_data_test(x, y, os.path.basename(data_path)[:-4], nsigma=1, test_portion=1, truncate=0.0)
 
