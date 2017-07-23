@@ -4,6 +4,7 @@ from ks_convergence.helpers import value_to_closest_index
 from mspyplot.plot import create_figure, add_axis_to_figure
 from ks_convergence.scheduler import scheduler
 from matplotlib.gridspec import GridSpec
+from scipy.optimize import curve_fit
 
 def find_converged_blocks(test_region_sizes, ks_error_estimates, convergence_criteria, step_size, equilibration_region_tolerance):
     def is_converged(x):
@@ -63,16 +64,24 @@ def run_ks_2samp_for_all(region_indexes, y, multithread=False):
         ks_values = [ks_test(y[-test_region_len:]) for test_region_len in region_indexes]
     return ks_values
 
+
+def run_ks_se_analysis(x, y, step_size_in_percent, nsigma, multithread):
+    step_size = (x[-1] - x[0]) * (step_size_in_percent / 100.0)
+    step_index = value_to_closest_index(x, x[0] + step_size)
+    if step_index == 0:
+        raise Exception("StepIndex = 0, this will cause infinite loop.")
+    test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index, multithread)
+    ks_error_estimates = nsigma * np.std(y) * np.array(ks_vals)
+    se_model_est = np.std(y) * ks_vals[-1] * np.sqrt(test_region_sizes[-1])
+    fitted_params, se_fit = fit_se_model(test_region_sizes, ks_error_estimates, se_model_est)
+    return se_fit, ks_error_estimates, test_region_sizes, step_size
+
 def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1,
     equilibration_region_tolerance=0.3, multithread=True, produce_figure=True, axes=None):
     equilibration_region_tolerance = converged_error_threshold
-    step_size = (x[-1]-x[0])*(step_size_in_percent/100.0)
-    step_index = value_to_closest_index(x, x[0]+step_size)
-    if step_index == 0:
-        raise Exception("StepIndex = 0, this will cause infinite loop.")
+    se_fit, ks_error_estimates, test_region_sizes, step_size = run_ks_se_analysis(x, y, step_size_in_percent, nsigma, multithread)
 
-    test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index, multithread)
-    ks_error_estimates = nsigma*np.std(y)*np.array(ks_vals)
+    se_fitted_error_est = se_fit[-1]
     entire_enseble_error_est = ks_error_estimates[-1]
 
     converged_blocks, block_min_ks = find_converged_blocks(
@@ -109,16 +118,24 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
         ax_summary, ax_ks = axes
 
     if ax_ks is not None and ax_summary is not None:
-        plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary)
+        plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary, se_fit=se_fit)
 
-    return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, fig
+    return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, se_fitted_error_est, fig
 
-def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False):
+def fit_se_model(test_region_sizes, ks_error_estimates, std_y):
+    def f_se(x, a):
+        return a/np.sqrt(x)
+    fitted_params, pcov = curve_fit(f_se, test_region_sizes, ks_error_estimates, p0=[std_y])
+    return fitted_params, f_se(test_region_sizes, *fitted_params)
+
+def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False, se_fit=None):
 
     ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="b",marker ='', markersize=4, label="$KS_{SE}$", linewidth=1.2)
+    if se_fit is not None:
+        ax_ks.plot(test_region_sizes, se_fit, linestyle='--',color="g",marker ='', label="$SE_{fit}$", linewidth=1)
     #ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
-    ax_ks.set_ylabel("$KS_{SE}\mathrm{\ (kJ\ mol^{-1})}$")
-    ax_ks.set_xlabel("$\Delta t$ (ps)")
+    ax_ks.set_ylabel("$KS_{SE}$")
+    ax_ks.set_xlabel("$t$ (ps)")
     #ax_ks.set_xlabel("N")
 
     ax_summary.plot(x, y, color="k", alpha=1)
