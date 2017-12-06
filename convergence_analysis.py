@@ -1,36 +1,11 @@
 from scipy.stats.stats import ks_2samp
 import numpy as np
 from ks_convergence.helpers import value_to_closest_index
-from mspyplot.plot import create_figure, add_axis_to_figure
+from mspyplot.plot import create_figure, add_axis_to_figure, save_figure
 from ks_convergence.scheduler import scheduler
 from matplotlib.gridspec import GridSpec
 from scipy.optimize import curve_fit
 
-def find_converged_blocks(test_region_sizes, ks_error_estimates, convergence_criteria, step_size, equilibration_region_tolerance):
-    def is_converged(x):
-        return x < convergence_criteria
-
-    converged_blocks = []
-    in_converged_block = False
-    for ks_err_est, test_region_size in zip(ks_error_estimates, test_region_sizes):
-        if in_converged_block and is_converged(ks_err_est):
-            converged_blocks[-1].append( (ks_err_est, test_region_size) )
-        elif is_converged(ks_err_est):
-            converged_blocks.append( [(ks_err_est, test_region_size)] )
-            in_converged_block = True
-        else:
-            in_converged_block = False
-
-    # rearrange data
-    converged_blocks = [zip(*block) for block in converged_blocks]
-
-    converged_block_bounds = []
-    min_ks = []
-    for block_ks_vals, block_test_region_sizes in converged_blocks:
-        min_ks_value, min_ks_region_size = find_min_point(block_ks_vals, block_test_region_sizes, convergence_criteria*equilibration_region_tolerance)
-        min_ks.append(min_ks_value)
-        converged_block_bounds.append( (block_test_region_sizes[0], min_ks_region_size) )
-    return converged_block_bounds, min_ks
 
 def find_min_point(block_ks_vals, block_test_region_sizes, value_discretisation):
     # Eue to the noise and flatness of curve values will be sorted based on
@@ -47,61 +22,53 @@ def find_min_point(block_ks_vals, block_test_region_sizes, value_discretisation)
 
 def test_multiple_regions(x, y, step_index, multithread):
     # length of test regions, ensure all value are considered by starting from len(x)
-    region_indexes = np.arange(len(x), 0, -step_index)[::-1]
+    region_indexes = np.arange(0, len(x), step_index)
     # convert indexes into x values
-    test_region_sizes = [(x[-1] - x[-test_region_len]) for test_region_len in region_indexes]
+    t_exclude = [x[test_region_len] for test_region_len in region_indexes]
     # perform ks test on first and 2nd halves of each region
     ks_vals = run_ks_2samp_for_all(region_indexes, y, multithread=multithread)
 
-    return test_region_sizes, ks_vals
+    return t_exclude, ks_vals
 
 def run_ks_2samp_for_all(region_indexes, y, multithread=False):
 
     if multithread:
-        args = [y[-test_region_len:] for test_region_len in region_indexes]
+        args = [y[test_region_len:] for test_region_len in region_indexes]
         ks_values = scheduler(ks_test, args)
     else:
-        ks_values = [ks_test(y[-test_region_len:]) for test_region_len in region_indexes]
+        ks_values = [ks_test(y[test_region_len:]) for test_region_len in region_indexes]
     return ks_values
 
 
-def run_ks_se_analysis(x, y, step_size_in_percent, nsigma, multithread):
+def run_ks_se_analysis(x, y, step_size_in_percent, nsigma, converged_error_threshold, multithread):
     step_size = (x[-1] - x[0]) * (step_size_in_percent / 100.0)
     step_index = value_to_closest_index(x, x[0] + step_size)
     if step_index == 0:
         raise Exception("StepIndex = 0, this will cause infinite loop.")
-    test_region_sizes, ks_vals = test_multiple_regions(x, y, step_index, multithread)
+    t_exclude, ks_vals = test_multiple_regions(x, y, step_index, multithread)
     ks_error_estimates = nsigma * np.std(y) * np.array(ks_vals)
-    se_model_est = np.std(y) * ks_vals[-1] * np.sqrt(test_region_sizes[-1])
-    fitted_params, se_fit = fit_se_model(test_region_sizes, ks_error_estimates, se_model_est)
-    return se_fit, ks_error_estimates, test_region_sizes, step_size
+    if ks_error_estimates[0] < converged_error_threshold:
+        equilibration_time_index = 0
+    else:
+        equilibration_time_index = np.argmax(ks_error_estimates < converged_error_threshold)
+    se_model_est = ks_error_estimates[equilibration_time_index] * np.sqrt(t_exclude[-1])
+    fitted_params, ks_se_fit = fit_se_model(t_exclude, ks_error_estimates, se_model_est, equilibration_time_index)
+    #ks_se_fit = ks_error_estimates
+    return ks_se_fit, ks_error_estimates, t_exclude, step_size, t_exclude[equilibration_time_index]
 
 def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1,
     equilibration_region_tolerance=0.3, multithread=True, produce_figure=True, axes=None):
     equilibration_region_tolerance = converged_error_threshold
-    se_fit, ks_error_estimates, test_region_sizes, step_size = run_ks_se_analysis(x, y, step_size_in_percent, nsigma, multithread)
+    ks_se_fit, ks_error_estimates, t_exclude, step_size, equilibration_time = run_ks_se_analysis(x, y, step_size_in_percent, nsigma, converged_error_threshold, multithread)
 
-    se_fitted_error_est = se_fit[-1]
-    entire_enseble_error_est = ks_error_estimates[-1]
+    se_fitted_error_est = ks_se_fit[0]
+    ks_err_est = ks_se_fit[0]
+    entire_enseble_error_est = ks_error_estimates[0]
 
-    converged_blocks, block_min_ks = find_converged_blocks(
-        test_region_sizes,
-        ks_error_estimates,
-        converged_error_threshold,
-        step_size,
-        equilibration_region_tolerance,
-        )
-
-    if converged_blocks:
-        largest_converged_block, largest_converged_block_minimum_ks\
-            = sorted(zip(converged_blocks, block_min_ks), key=lambda x: x[0][1] - x[0][0])[-1]
-        minimum_sampling_time = largest_converged_block[0]
-        equilibration_time = x[-1] - largest_converged_block[1]
-        ks_err_est = largest_converged_block_minimum_ks
+    if ks_err_est < converged_error_threshold:
+        time_below_threshold = t_exclude[np.argmax(ks_se_fit > converged_error_threshold)+1]
     else:
-        minimum_sampling_time = float("inf")
-        equilibration_time = float("inf")
-        ks_err_est = entire_enseble_error_est
+        time_below_threshold = 0
 
     if produce_figure and axes is None:
         fig = create_figure(figsize=(3.5, 4.0))
@@ -118,24 +85,33 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
         ax_summary, ax_ks = axes
 
     if ax_ks is not None and ax_summary is not None:
-        plot_figure(x, y, test_region_sizes, ks_error_estimates, equilibration_time, minimum_sampling_time, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary, se_fit=se_fit)
+        plot_figure(x, y, t_exclude, ks_error_estimates, equilibration_time, time_below_threshold, converged_error_threshold, step_size_in_percent, ax_ks, ax_summary, se_fit=ks_se_fit)
 
-    return minimum_sampling_time, equilibration_time, ks_err_est, entire_enseble_error_est, se_fitted_error_est, fig
+    return time_below_threshold, equilibration_time, ks_err_est, entire_enseble_error_est, se_fitted_error_est, fig
 
-def fit_se_model(test_region_sizes, ks_error_estimates, std_y):
+def fit_se_model(t_exclude, ks_error_estimates, std_y, equilibration_time_index):
     def f_se(x, a):
         return a/np.sqrt(x)
-    fitted_params, pcov = curve_fit(f_se, test_region_sizes, ks_error_estimates, p0=[std_y])
-    return fitted_params, f_se(test_region_sizes, *fitted_params)
 
-def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_sampling_time, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False, se_fit=None):
+    # need to start at 1 due to f_se not being defined for 0
+    t_exclude_truncation_index = None if equilibration_time_index == 0 else -equilibration_time_index
+    fitted_params, pcov = curve_fit(f_se, t_exclude[1:t_exclude_truncation_index], ks_error_estimates[equilibration_time_index:-1][::-1], p0=[std_y])
+    fig = create_figure(figsize=(3.5, 4.0))
+    ax = add_axis_to_figure(fig)
+    ax.plot(t_exclude[:t_exclude_truncation_index], ks_error_estimates[equilibration_time_index:][::-1])
+    ax.plot(t_exclude[1:t_exclude_truncation_index], f_se(t_exclude[1:t_exclude_truncation_index], *fitted_params))
+    save_figure(fig, "test.png")
+    return fitted_params, f_se(t_exclude[1:t_exclude_truncation_index], *fitted_params)[::-1]
 
-    ax_ks.plot(test_region_sizes, ks_values, linestyle='-',color="b",marker ='', markersize=4, label="$KS_{SE}$", linewidth=1.2)
+def plot_figure(x, y, t_exclude, ks_values, equilibration_time, time_below_threshold, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False, se_fit=None):
+
+    ax_ks.plot(t_exclude, ks_values, linestyle='-',color="b",marker ='', markersize=4, label="$KS_{SE}$", linewidth=1.2)
     if se_fit is not None:
-        ax_ks.plot(test_region_sizes, se_fit, linestyle='--',color="g",marker ='', label="$SE_{fit}$", linewidth=1)
-    #ax_ks.plot([0, max(test_region_sizes)], [convergence_criteria, convergence_criteria], linestyle='-',color="r", zorder=3)
+        # se_fit is undefined at 0
+        ax_ks.plot(t_exclude[-len(se_fit):], se_fit, linestyle='--',color="g",marker ='', label="$SE_{fit}$", linewidth=1.2, zorder=4)
+    ax_ks.plot([0, max(t_exclude)], [convergence_criteria, convergence_criteria], dashes=(1,1), color="K", zorder=3)
     ax_ks.set_ylabel("$KS_{SE}$")
-    ax_ks.set_xlabel("$t$ (ps)")
+    ax_ks.set_xlabel("$t_{excl}$ (ps)")
     #ax_ks.set_xlabel("N")
 
     ax_summary.plot(x, y, color="k", alpha=1)
@@ -150,10 +126,10 @@ def plot_figure(x, y, test_region_sizes, ks_values, equilibration_time, minimum_
         equilibrated_region_mean = np.mean(y[equilibration_time_right_bound:])
         ax_summary.errorbar([x[-1] - (x[-1] - equilibration_time)/2.0], [equilibrated_region_mean], xerr=[(x[-1] - equilibration_time)/2.0], color="b", marker ='o', linestyle='', zorder=3, linewidth=2)
 
-    ax_summary.set_ylabel("$\partial V/\partial \lambda$")
+    ax_summary.set_ylabel("$y$")
     ax_summary.set_xlabel("$t$ (ps)")
-    ax_summary.set_xlim((0, max(x)))
-    ax_ks.set_xlim((0,max(x)))
+    ax_summary.set_xlim((0, max(t_exclude)))
+    ax_ks.set_xlim((0,max(t_exclude)))
 
 def ks_test(x):
     test_values, ref_values = x[:len(x)/2], x[len(x)/2:]

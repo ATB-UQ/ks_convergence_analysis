@@ -15,10 +15,10 @@ from mspyplot.plot import plot, save_figure, create_figure, add_axis_to_figure, 
     create_subplot_layout
 from red_noise import red_noise
 import matplotlib
-cmap = matplotlib.cm.get_cmap('jet')
+cmap = matplotlib.cm.get_cmap('hot')
 
 TEST_DATA = ["large_data_set.dat", "not_converged_test.dat", "converged_test.dat", "converged_test_2.dat"]
-TARGET_ERROR = 5
+TARGET_ERROR = 7
 
 def sloppy_data_parser(file_name):
     with open(file_name) as fh:
@@ -56,9 +56,9 @@ def test_red_noise(sigma, tau, seed):
     save_figure(fig, file_name)
     return file_name+".png"
 
-def plot_correlations(true_error, error_est, bse_error):
-    true_error, error_est, bse_error = zip(*[v for v in zip(true_error, error_est, bse_error) if v[0] > 0.5])
-    linregress(true_error, error_est)[0]
+def plot_correlations(true_error, error_est, bse_error, name):
+    #true_error, error_est, bse_error = zip(*[v for v in zip(true_error, error_est, bse_error) if v[0] > 0.5])
+    print linregress(true_error, error_est)[0]
     fig = create_figure(figsize=(6, 6))
     ax1 = add_axis_to_figure(fig, subplot_layout="211")
     ax2 = add_axis_to_figure(fig, subplot_layout="212", sharey=ax1)
@@ -66,17 +66,17 @@ def plot_correlations(true_error, error_est, bse_error):
     ax2.scatter(true_error, bse_error)
     ax1.set_ylim((0, 1.5))
     fig.tight_layout()
-    save_figure(fig, "correlations")
+    save_figure(fig, name)
 
 def distribution_analysis():
-    N = 5000
+    N = 2000
     fig = create_figure(figsize=(6, 6))
     for sigma, tau, layout, add_labels, x_label, y_label in zip(
         [5, 5, 10, 10], [2, 5, 2, 5], ["221","222","223","224"],
         [True]+[False]*3, [None, None, "error", "error"], ["occurrence", None, "occurrence", None]
         ):
         ax = add_axis_to_figure(fig, subplot_layout=layout)
-        args = (500, N, sigma, 0, tau, 1, True)
+        args = (200, N, sigma, 0, tau, 1, True)
         results = red_noise_worker(args)
         error_est, _, bse_error, true_error = zip(*results)
         for data, color, label in zip([bse_error, error_est, true_error,], [ "o", "b", "g",], ["Block averaging","$KS_{SE}$", "True difference", ]):
@@ -92,8 +92,10 @@ def distribution_analysis():
         ax.set_ylim((0, ylim[1]))
         se = sigma*np.sqrt(tau/float(N))
         ax.plot([se, se], [0, ylim[1]], color="k")
-        if sigma==5 and tau == 5:
-            plot_correlations(true_error, error_est , bse_error)
+        #median = np.percentile(true_error, 50)
+        #ax.plot([median, median], [0, ylim[1]], color="r")
+
+        plot_correlations(true_error, error_est, bse_error, "correlations_{0}_{1}".format(sigma, tau))
 
     max_x = max([ax.get_xlim()[1] for ax in fig.get_axes()])
     for ax in fig.get_axes():
@@ -102,20 +104,20 @@ def distribution_analysis():
     save_figure(fig, "kde")
 
 def generate_extended_data():
-    N_replicates = 50
+    N_replicates = 500
     nsigmas = 1
     multithread = False
     N = 5000 # frames
     mean = 0 #dt = 0.020 # time between frames ps
     #tau_range = np.array([0.05, 5, 20])
     #discrete_tau_range = tau_range/dt
-    discrete_tau_range = [2, 5, 20]
+    discrete_tau_range = [2, 10, 20]
     sigma_range = np.linspace(1, 20, 6)
     print sigma_range
     print discrete_tau_range
     job_inputs = [(N_replicates, N, sigma, mean, discrete_tau, nsigmas, multithread) for discrete_tau in discrete_tau_range for sigma in sigma_range]
     results = scheduler(red_noise_worker, job_inputs)
-    _, _, sigmas, _, discrete_taus, _ = zip(*job_inputs)
+    _, _, sigmas, _, discrete_taus, _, _ = zip(*job_inputs)
     true_mean_errors, ks_mean_errors, se_errors, bse_mean_errors = [], [], [], []
     for result, sigma, tau_discrete in zip(results, sigmas, discrete_taus):
         ks_error_values, se_values, bse_values, true_error_values = zip(*result)
@@ -123,7 +125,7 @@ def generate_extended_data():
         #ks_mean_errors.append([np.percentile(ks_error_values, p) for p in [25, 50, 75]])
         #bse_mean_errors.append([np.percentile(bse_values, p) for p in [25, 50, 75]])
         true_mean_errors.append( [np.mean(true_error_values), np.std(true_error_values)])
-        ks_mean_errors.append( [np.mean(ks_error_values), np.std(true_error_values)] )
+        ks_mean_errors.append( [np.mean(ks_error_values), np.std(ks_error_values)] )
         bse_mean_errors.append( [np.mean(bse_values), np.std(bse_values)] )
         se_errors.append(se_values[0]) #print "sig={0}, tau={1}({7}): mean error={6:.3f}, mean KS error={2:.3f} (failure rate={3:.3f}), SE={4:.3f} (failure rate={5:.3f})".format(
 
@@ -151,49 +153,53 @@ def extended_red_noise_test():
     tau_aggregated_data = {}
     for sigma, tau_discrete, true_mean_error, ks_mean_error, bse_error, se_error in zip(sigmas, discrete_taus, true_mean_errors, ks_mean_errors, bse_mean_errors, se_errors):
         tau_aggregated_data.setdefault(tau_discrete, []).append((sigma, true_mean_error, ks_mean_error, bse_error, se_error))
-    fig = create_figure(figsize=(9, 3))
-    ax_true = add_axis_to_figure(fig, subplot_layout=131)
-    ax_ks = add_axis_to_figure(fig, subplot_layout=132)
-    ax_bse = add_axis_to_figure(fig, subplot_layout=133)
-    for tau, data in sorted(tau_aggregated_data.items()):
-        plot_red_noise_grid(ax_true, ax_ks, ax_bse, tau, data, color=cmap(tau/float(max(discrete_tau_range)-min(discrete_tau_range)) ))
+    fig = create_figure(figsize=(7, 3))
+    ax_ks = add_axis_to_figure(fig, subplot_layout=121)
+    ax_bse = add_axis_to_figure(fig, subplot_layout=122)
+    #ax_bse = add_axis_to_figure(fig, subplot_layout=133)
+    #cmap.set_gamma(1.5)
+    symbols = ["o","s","^"]
+    for i, (tau, data) in enumerate(sorted(tau_aggregated_data.items())[::-1]):
+        plot_red_noise_grid(ax_ks, ax_bse, tau, data, symbol=symbols[i], color=cmap(tau/float(max(discrete_tau_range)-min(discrete_tau_range))/1.8 ))
 
-    max_v = max([ax_true.get_ylim()[1], ax_ks.get_ylim()[1], ax_bse.get_ylim()[1]])
+    max_v = max([ax_ks.get_ylim()[1], ax_bse.get_ylim()[1]])
 
-    ax_true.set_title("True difference")
-    ax_true.set_ylabel("mean error")
-    ax_true.set_xlabel("$\sigma_{\epsilon}$")
-    ax_true.set_ylim((0, max_v))
-    ax_true.set_xlim((0, 15))
+    #ax_true.set_title("True difference")
+    #ax_true.set_ylabel("mean error")
+    #ax_true.set_xlabel("$\sigma_{\epsilon}$")
+    #ax_true.set_ylim((0, max_v))
+    #ax_true.set_xlim((0, 20))
 
     ax_ks.set_title("$KS_{SE}$")
-    #ax_ks.set_ylabel("mean error")
+    ax_ks.set_ylabel("mean error")
     ax_ks.set_xlabel("$\sigma_{\epsilon}$")
     ax_ks.set_ylim((0, max_v))
-    ax_ks.set_xlim((0, 15))
+    ax_ks.set_xlim((0, 20))
 
     ax_bse.set_title("Block averaging")
     #ax_ks.set_ylabel("mean error")
     ax_bse.set_xlabel("$\sigma_{\epsilon}$")
     ax_bse.set_ylim((0, max_v))
-    ax_bse.set_xlim((0, 15))
+    ax_bse.set_xlim((0, 20))
     fig.tight_layout()
     save_figure(fig, "red_noise_2D_combined")
 
-def plot_red_noise_grid(ax_true, ax_ks, ax_bse, tau, data, color, show_label=False):
+def plot_red_noise_grid(ax_ks, ax_bse, tau, data, color, show_label=True, symbol="o"):
     sigma, true_mean_error, ks_mean_error, bse_mean_error, se_error = zip(*data)
-    label = "tau={0:.1f}ps".format(tau) if show_label else None
-    plot_kwargs = dict(symbol="o", marker_size=4, label=label, color=color, legend_position="upper left")
+    label = "$\\tau={0:.0f}$".format(tau) if show_label else None
+    plot_kwargs = dict(symbol=symbol, marker_size=4, label=label, color=color, legend_position="upper left")
 
     true, true_std = zip(*true_mean_error)
     ks, ks_std = zip(*ks_mean_error)
     bse, bse_std = zip(*bse_mean_error)
     plot(ax_ks, sigma, ks, yerr=ks_std, **plot_kwargs)
     plot(ax_bse, sigma, bse, yerr=bse_std, **plot_kwargs)
-    plot_kwargs["label"] = "$\\tau$ ={0:.0f}".format(tau)
-    plot(ax_true, sigma, true, yerr=true_std, **plot_kwargs)
+    #plot_kwargs["label"] = "$\\tau$ ={0:.0f}".format(tau)
+    plot_kwargs["label"] = ""
+    plot_kwargs["symbol"] = ""
+    #plot(ax_true, sigma, true, yerr=true_std, **plot_kwargs)
 
-    plot(ax_true, sigma, se_error, dashes=(4,2), **plot_kwargs)
+    #plot(ax_true, sigma, se_error, dashes=(4,2), **plot_kwargs)
     plot(ax_ks, sigma, se_error, dashes=(4,2), **plot_kwargs)
     plot(ax_bse, sigma, se_error, dashes=(4,2), **plot_kwargs)
     return
@@ -229,8 +235,8 @@ def single_point_ks_test(y, nsigma=1):
     return nsigma*np.std(y)*ks_test(y)
 
 def fitted_se_model(x, y, multithread=False):
-    se_fit, ks_error_estimates, test_region_sizes, step_size = run_ks_se_analysis(x, y, 1, 1, multithread)
-    return se_fit[-1]
+    se_fit, ks_error_estimates, test_region_sizes, step_size, t_eq = run_ks_se_analysis(x, y, 1, 1, 1, multithread)
+    return se_fit[0]
 
 def error_est_red_noise(N, sigma, mean, tau_discrete, seed=None):
     print "Processing red noise: tau_discrete={0}, sigma={1}".format(tau_discrete, sigma)
@@ -239,115 +245,109 @@ def error_est_red_noise(N, sigma, mean, tau_discrete, seed=None):
     return run(x, y)[-1], x, y
 
 def run(x, y, name=None, nsigma=1, axes=None, target_error=TARGET_ERROR):
-    minimum_sampling_time, equilibration_time, largest_converged_block_minimum_ks_err, entire_enseble_error_est, se_fit_error_est, fig = \
+    time_below_threshold, equilibration_time, largest_converged_block_minimum_ks_err, entire_enseble_error_est, se_fit_error_est, fig = \
         ks_convergence_analysis(x, y, target_error, nsigma=nsigma, step_size_in_percent=1, axes=axes)
 
     if name is not None and fig is not None:
         fig.tight_layout()
         save_figure(fig, name)
     print " Equilibration time: {0:5.1f} ps".format(equilibration_time)
-    print " Minimum sampling time: {0:5.1f} ps".format(minimum_sampling_time)
+    print " time below target error: {0:5.1f} ps".format(time_below_threshold)
     equilibrium_sampling_length = x[-1] - equilibration_time
     print " Equilibrium sampling length: {0:5.1f} ps".format(equilibrium_sampling_length)
     print " Equilibrated region: {0:5.1f}-->{1:5.1f} ps".format(equilibration_time, x[-1])
-    print " Convergence robustness: {0:5.3f}".format(equilibrium_sampling_length / minimum_sampling_time)
+    print " Convergence robustness: {0:5.3f}".format((time_below_threshold - equilibration_time) / (x[-1] - time_below_threshold))
     print " Entire ensemble KS error estimate: {0:5.3g} kJ/mol".format(entire_enseble_error_est)
     print " KS SE fit error estimate: {0:5.3g} kJ/mol".format(se_fit_error_est)
     print " Truncated KS error estimate: {0:5.3g} kJ/mol".format(largest_converged_block_minimum_ks_err)
-    return equilibration_time, minimum_sampling_time, fig
+    return equilibration_time, time_below_threshold, fig
 
 def equilibration_examples(data_file):
-    fig = create_figure(figsize=(6,4))
+    fig = create_figure(figsize=(6.5,4.5))
 
     gs = GridSpec(3, 2)
     ax_summary_c = fig.add_subplot(gs[0,0])
     ax_ks_c = fig.add_subplot(gs[1:3,0])
 
     x_c, y_c = sloppy_data_parser("large_data_set.dat")
-    run(x_c[:10000], y_c[50000:60000].T, name="converged", axes=[ax_summary_c, ax_ks_c])
-    ax_ks_c.invert_xaxis()
+    run(x_c[:10000], y_c[53000:63000].T, name="converged", axes=[ax_summary_c, ax_ks_c], target_error=0.5)
+    ax_ks_c.set_xlabel("$t_{excl}\ (ps)$")
+    ax_ks_c.set_ylabel("$KS_{SE}\ (\mathrm{kJ\ mol^{-1}})$")
+    ax_summary_c.set_ylabel("$\partial V/\partial \lambda\ (\mathrm{kJ\ mol^{-1}})$")
+
     ax_summary_d = fig.add_subplot(gs[0,1])
     ax_ks_d = fig.add_subplot(gs[1:3,1])
 
 
     x_d, y_d = sloppy_data_parser(data_file)
-    run(x_d, y_d, name="slow_drift", axes=[ax_summary_d, ax_ks_d])
-    ax_ks_d.set_ylabel("")
-    ax_summary_d.set_ylabel("$P$")
-    ax_ks_d.invert_xaxis()
+    equilibration_time_d, time_below_threshold_d, _ = run(x_d, y_d, name="slow_drift", axes=[ax_summary_d, ax_ks_d], target_error=5)
+    print (time_below_threshold_d - equilibration_time_d)/float(x_d[-1] - time_below_threshold_d)
+    ylims = list(ax_ks_d.get_ylim())
+    ax_ks_d.axvline(x=equilibration_time_d, color="r")
+    ax_ks_d.text(equilibration_time_d, ylims[1], "$t_{eq}$", fontsize=14, horizontalalignment='center',
+        verticalalignment='bottom',)
+    ax_ks_d.set_ylabel("$KS_{SE}\ (\mathrm{atm})$")
+    ax_ks_d.set_xlabel("$t_{excl}\ (ps)$")
+    ax_summary_d.set_ylabel("$P\ (\mathrm{atm})$")
+
     fig.tight_layout()
     save_figure(fig, "equilibration_examples")
 
-    block=5000
-    N = len(x_d)
-    fig = create_figure(figsize=(6.5, 3))
-    ax1 = add_axis_to_figure(fig, "121")
-    ax2 = add_axis_to_figure(fig, "122")
-    plot(ax1, x_d[:N], y_d[:N], alpha=0.5)
-    mid_block = block/2
-    plot(ax1, [x_d[mid_block + i] for i in range(len(y_d[:N])-block)], [np.mean(y_d[i:block+i]) for i in range(len(y_d[:N])-block)], color="r")
-    plot(ax2, x_d[:N-block], [np.mean(y_d[i:block+i]) for i in range(len(y_d[:N])-block)], color="r")
-    ax1.set_ylabel("$\partial V/\partial \lambda\mathrm{\ (kJ\ mol^{-1})}$")
-    ax1.set_xlim((0, max(x_d[:N])))
-    ax2.set_xlim((0, max(x_d[:N])))
-    ax1.set_xlabel("$t$ (ps)")
-    ax2.set_xlabel("$t$ (ps)")
-    fig.tight_layout()
-    save_figure(fig, "closer_look")
-
 def convergence_heuristic():
-    target_error = 10
-    fig = create_figure(figsize=(7,3))
+    target_error = 1
+    fig = create_figure(figsize=(6.5,4.5))
+    gs = GridSpec(3, 2)
+    ax_summary_c = fig.add_subplot(gs[0,0])
+    ax_ks_c = fig.add_subplot(gs[1:3,0])
+    ax_summary_d = fig.add_subplot(gs[0,1])
+    ax_ks_d = fig.add_subplot(gs[1:3,1])
 
-    fig2 = create_figure(figsize=(3,3))
 
-    ax_c = add_axis_to_figure(fig, "121")
-    ax_d = add_axis_to_figure(fig, "122")
-
-    ax_summary_c = add_axis_to_figure(fig2, "121")
-    ax_summary_d = add_axis_to_figure(fig2, "122")
-    x_d, y_d = sloppy_data_parser("pressu.dat")
+    x_d, y_d = sloppy_data_parser("dvdl.dat")
     x_c, y_c = sloppy_data_parser("large_data_set.dat")
 
-    equilibration_time_c, minimum_sampling_time_c, _ = run(x_c[:10000], y_c[50000:60000].T, name="converged", axes=[ax_summary_c, ax_c], target_error=1)
+    equilibration_time_c, time_below_threshold_c, _ = run(x_c[:5000], y_c[50000:55000].T, name="converged", axes=[ax_summary_c, ax_ks_c], target_error=1)
 
-    ylims = list(ax_c.get_ylim())
+    ylims = list(ax_ks_c.get_ylim())
     ylims[1] = 3.5
-    ax_c.plot([0, max(x_c)], [1, 1], color="k", dashes=(1,1))
-    ax_c.axvline(x=x_c[-1]-equilibration_time_c, color="r")
-    ax_c.axvline(x=minimum_sampling_time_c, color="g")
-    ax_c.text(minimum_sampling_time_c, ylims[1], "$\Delta t_{1<E_{target}}$", fontsize=14, horizontalalignment='center',
+    ax_ks_c.plot([0, max(x_c)], [1, 1], color="k", dashes=(1,1))
+    #ax_c.axvline(x=equilibration_time_c, color="r")
+    ax_ks_c.axvline(x=time_below_threshold_c, color="k")
+    ax_ks_c.text(time_below_threshold_c, ylims[1], "$t_{excl}<E_{target}$", fontsize=14, horizontalalignment='center',
         verticalalignment='bottom',)
     #ax_c.text(x_c[-1]-equilibration_time_c-30, ylims[1]+0.5, "$t_{2}$", fontsize=14)
-    print minimum_sampling_time_c
-    print (x_c[10000]-minimum_sampling_time_c)/minimum_sampling_time_c
-    ax_c.set_ylim(ylims)
-    ax_c.invert_xaxis()
+    print time_below_threshold_c
+    print equilibration_time_c
+    print (time_below_threshold_c-equilibration_time_c)/float(x_c[5000] - time_below_threshold_c)
+    ax_ks_c.set_ylim(ylims)
+    ax_summary_c.set_ylabel("$\partial V/\partial \lambda\ (\mathrm{kJ\ mol^{-1}})$")
+    ax_ks_c.set_ylabel("$KS_{SE}\ (\mathrm{kJ\ mol^{-1}})$")
+    #ax_c.invert_xaxis()
 
-    equilibration_time, minimum_sampling_time, _ = run(x_d, y_d, name="slow_drift", axes=[ax_summary_d, ax_d], target_error=target_error)
-    print minimum_sampling_time
-    print x_d[-1]-equilibration_time-minimum_sampling_time
-    print (x_d[-1]-equilibration_time-minimum_sampling_time)/minimum_sampling_time
-    ylims = ax_d.get_ylim()
-    ax_d.plot([0, max(x_d)], [target_error, target_error], color="k", dashes=(1,1))
+    equilibration_time_d, time_below_threshold_d, _ = run(x_d, y_d, name="slow_drift", axes=[ax_summary_d, ax_ks_d], target_error=target_error)
+    print time_below_threshold_d
+    print (time_below_threshold_d-equilibration_time_d)/float(x_d[-1] - time_below_threshold_d)
+    ylims = ax_ks_d.get_ylim()
+    ax_ks_d.plot([0, max(x_d)], [target_error, target_error], color="k", dashes=(1,1))
     #ax_d.plot([minimum_sampling_time, minimum_sampling_time], [0, ylims[1]], color="g")
     #ax_d.plot([x_d[-1]-equilibration_time, x_d[-1]-equilibration_time], [0, ax_d.get_ylim()[1]], color="r")
-    ax_d.axvline(x=x_d[-1]-equilibration_time, color="r")
-    ax_d.axvline(x=minimum_sampling_time, color="g")
-    ax_d.text(minimum_sampling_time, ylims[1], "$\Delta t_{1<E_{target}}$", fontsize=14, horizontalalignment='center',
+    #ax_d.axvline(x=x_d[-1]-equilibration_time, color="r")
+    ax_ks_d.axvline(x=time_below_threshold_d, color="k")
+    ax_ks_d.text(time_below_threshold_d, ylims[1], "$t_{excl}<E_{target}$", fontsize=14, horizontalalignment='center',
         verticalalignment='bottom',)
-    ax_d.text(x_d[-1]-equilibration_time, ylims[1], "$\Delta t_{2<E_{target}}$", fontsize=14, horizontalalignment='center',
-        verticalalignment='bottom',)
-    ax_d.set_ylabel("")
-    ax_d.set_ylim(ylims)
-    ax_d.invert_xaxis()
+    #ax_d.text(equilibration_time, ylims[1], "$\Delta t_{2<E_{target}}$", fontsize=14, horizontalalignment='center',
+    #    verticalalignment='bottom',)
+    ax_ks_d.set_ylabel("")
+    ax_summary_d.set_ylabel("")
+    ax_ks_d.set_ylim(ylims)
+    #ax_d.invert_xaxis()
     save_figure(fig, "convergence_heuristic")
 
 
 def run_real_data_test(x, y, name=None, nsigma=1, test_portion=0.1, truncate=0.1):
     n_truncate = int(len(x)*truncate)
     n_test_samples = int(len(x)*test_portion)
-    minimum_sampling_time, equilibration_time, largest_converged_block_minimum_ks_err, entire_enseble_error_est, fig = \
+    minimum_sampling_time, equilibration_time, largest_converged_block_minimum_ks_err, entire_enseble_error_est, se_fitted_error_est, fig = \
         ks_convergence_analysis(x[n_truncate:n_truncate+n_test_samples], y[n_truncate:n_truncate+n_test_samples], TARGET_ERROR, nsigma=nsigma)
     reference_value = abs(np.mean(y[n_truncate+n_test_samples:] - np.mean(y[n_truncate:n_truncate+n_test_samples])))
     if name is not None:
@@ -362,8 +362,8 @@ def run_real_data_test(x, y, name=None, nsigma=1, test_portion=0.1, truncate=0.1
     print " Convergence robustness: {0:5.3f}".format(equilibrium_sampling_length / minimum_sampling_time)
     print " Entire ensemble KS error estimate: {0:5.3g} kJ/mol".format(entire_enseble_error_est)
     print " Truncated KS error estimate: {0:5.3g} kJ/mol".format(largest_converged_block_minimum_ks_err)
-    print "{0:5.3g} ({1:5.3g}) kJ/mol".format(entire_enseble_error_est, reference_value)
-    return entire_enseble_error_est, reference_value, equilibration_time, name
+    print "{0:5.3g} ({1:5.3g}) kJ/mol".format(se_fitted_error_est, reference_value)
+    return se_fitted_error_est, reference_value, equilibration_time, name
 
 def real_data_tests(sigma):
     cache_file = "simga{0}_real_test_results.pickle".format(sigma)
@@ -419,10 +419,10 @@ def real_data():
 
 def run_all():
     #red_noise_examples()
-    distribution_analysis()
+    #distribution_analysis()
     #extended_red_noise_test()
-    #equilibration_examples("pressu.dat")
-    #convergence_heuristic()
+    equilibration_examples("pressu.dat")
+    convergence_heuristic()
     #horizontal(["red_noise_2D_true.png", "red_noise_2D_ks.png", "../../block_averaging/test/red_noise_2D.png"],
     #    "combined_2D_red_noise.png")
     #real_data()
