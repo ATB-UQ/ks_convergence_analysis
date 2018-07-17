@@ -63,4 +63,5 @@ def plot_figure(x, y, t_exclude, ks_values, equilibration_time, time_below_thres
     ax_summary.set_ylabel("$y$")
     ax_summary.set_xlabel("$t$ (ps)")
     ax_summary.set_xlim((0, max(t_exclude)))
+    ax_summary.locator_params(axis='y', nbins=3)
     ax_ks.set_xlim((0,max(t_exclude)))

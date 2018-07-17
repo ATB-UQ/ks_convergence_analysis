@@ -1,11 +1,10 @@
 import sys
 import os
 import numpy as np
-from convergence_analysis import print_results
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ks_convergence.convergence_analysis import ks_convergence_analysis
+from ks_convergence.convergence_analysis import ks_convergence_analysis, print_results
 from ks_convergence.helpers.plot import save_figure, create_figure, GridSpec
 
 def sloppy_data_parser(file_name):
@@ -101,16 +100,7 @@ def convergence_heuristic(data_file_converged, data_file_not_converged):
 
 
 if __name__=="__main__":
+    x, y = sloppy_data_parser("data/23274_dvdl.dat")
+    run(x, y, 0.5, "dvdl")
     equilibration_examples("data/long_dvdl.dat", "data/pressu.dat")
     convergence_heuristic("data/long_dvdl.dat", "data/short_dvdl.dat")
-    x, y = sloppy_data_parser("data/1pgb_rmsd_stbl_backbone_rep_1.dat")
-    run(x, y, 0.002, "1pgb_rmsd_stbl_backbone_rep_1")
-
-    x, y = sloppy_data_parser("data/2nls_rmsd_stbl_backbone_rep_1.dat")
-    run(x, y, 0.02, "2nls_rmsd_stbl_backbone_rep_1")
-
-    x, y = sloppy_data_parser("data/apl.xvg")
-    run(x, y, 0.002, "apl")
-
-    x, y = sloppy_data_parser("data/23274_dvdl.dat")
-    run(x, y, 1, "dvdl")

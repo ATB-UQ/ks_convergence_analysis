@@ -140,7 +140,7 @@ def print_results(xs, ks_err_est, equilibration_time, time_below_threshold, enti
 
     print "Convergence robustness: {0:g}".format(round_sf(time_below_threshold / (equilibrium_sampling_length - time_below_threshold)))
     print "Entire ensemble KS error estimate: {0:g}".format(round_sf(entire_enseble_error_est))
-    print "Truncated KS error estimate: {0:g}".format(round_sf(ks_err_est))
+    print "Fitted KS error estimate: {0:g}".format(round_sf(ks_err_est))
 
 def run(xs, ys, target_error, figure_name, sigfigs, verbose):
 
