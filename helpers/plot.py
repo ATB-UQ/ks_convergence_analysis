@@ -4,7 +4,7 @@ from matplotlib.gridspec import GridSpec
 import pylab
 import numpy as np
 
-from ks_convergence.helpers.misc import value_to_closest_index
+from ks_convergence_analysis.helpers.misc import value_to_closest_index
 
 matplotlib.rc("mathtext", fontset="stix")
 

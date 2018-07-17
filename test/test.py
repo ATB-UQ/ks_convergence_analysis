@@ -2,10 +2,10 @@ import sys
 import os
 import numpy as np
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from ks_convergence.convergence_analysis import ks_convergence_analysis, print_results
-from ks_convergence.helpers.plot import save_figure, create_figure, GridSpec
+from ks_convergence_analysis.convergence_analysis import ks_convergence_analysis, print_results
+from ks_convergence_analysis.helpers.plot import save_figure, create_figure, GridSpec
 
 def sloppy_data_parser(file_name):
     with open(file_name) as fh:
@@ -40,7 +40,7 @@ def equilibration_examples(data_file_no_equilibration, data_file_equilibration):
 
 
     x_d, y_d = sloppy_data_parser(data_file_equilibration)
-    equilibration_time_d, time_below_threshold_d, _ = run(x_d, y_d, target_error=5, name="slow_drift", axes=[ax_summary_d, ax_ks_d])
+    equilibration_time_d, time_below_threshold_d, _ = run(x_d, y_d, target_error=5, name="pressure", axes=[ax_summary_d, ax_ks_d])
     ylims = list(ax_ks_d.get_ylim())
     ax_ks_d.axvline(x=equilibration_time_d, color="r")
     ax_ks_d.text(equilibration_time_d, ylims[1], "$t_{eq}$", fontsize=14, horizontalalignment='center',
@@ -81,7 +81,7 @@ def convergence_heuristic(data_file_converged, data_file_not_converged):
     ax_ks_c.set_ylabel("$KS_{SE}\ (\mathrm{kJ\ mol^{-1}})$")
     #ax_c.invert_xaxis()
 
-    equilibration_time_d, time_below_threshold_d, _ = run(x_d, y_d, target_error=target_error, name="slow_drift", axes=[ax_summary_d, ax_ks_d])
+    equilibration_time_d, time_below_threshold_d, _ = run(x_d, y_d, target_error=target_error, name="not_converged", axes=[ax_summary_d, ax_ks_d])
     ylims = ax_ks_d.get_ylim()
     ax_ks_d.plot([0, max(x_d)], [target_error, target_error], color="k", dashes=(1,1))
     #ax_d.plot([minimum_sampling_time, minimum_sampling_time], [0, ylims[1]], color="g")
@@ -97,7 +97,6 @@ def convergence_heuristic(data_file_converged, data_file_not_converged):
     ax_ks_d.set_ylim(ylims)
     #ax_d.invert_xaxis()
     save_figure(fig, "convergence_heuristic")
-
 
 if __name__=="__main__":
     x, y = sloppy_data_parser("data/23274_dvdl.dat")

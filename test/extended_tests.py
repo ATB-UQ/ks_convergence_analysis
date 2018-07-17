@@ -5,8 +5,8 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scipy.stats.mstats_basic import linregress
 
-from ks_convergence.helpers.scheduler import scheduler
-from ks_convergence.convergence_analysis import run_ks_se_analysis
+from ks_convergence_analysis.helpers.scheduler import scheduler
+from ks_convergence_analysis.convergence_analysis import run_ks_se_analysis
 from test import run
 
 from mspyplot.plot import plot, save_figure, create_figure, add_axis_to_figure, generate_histogram, plot_with_kde

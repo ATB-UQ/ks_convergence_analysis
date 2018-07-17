@@ -7,14 +7,14 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from ks_convergence.helpers.plot import plot_figure, create_figure, GridSpec, save_figure
+    from ks_convergence_analysis.helpers.plot import plot_figure, create_figure, GridSpec, save_figure
     CAN_PLOT = True
 except ImportError as e:
     CAN_PLOT = False
     print "An error occurred while importing helpers.plot, plotting will be disabled: {0}".format(e)
 
-from ks_convergence.helpers.scheduler import scheduler
-from ks_convergence.helpers.misc import value_to_closest_index, sloppy_data_parser, round_sigfigs
+from ks_convergence_analysis.helpers.scheduler import scheduler
+from ks_convergence_analysis.helpers.misc import value_to_closest_index, sloppy_data_parser, round_sigfigs
 
 DEFAULT_FIGURE_NAME = "ks_convergence.png"
 SIGFIGS = 3
