@@ -1,6 +1,6 @@
 import sys
 from multiprocessing import Pool, cpu_count
-import random
+
 
 def scheduler(target, job_inputs, ncpu=None, verbose=True):
     ncpu = cpu_count() if ncpu is None else ncpu
@@ -10,11 +10,3 @@ def scheduler(target, job_inputs, ncpu=None, verbose=True):
     result = p.map(target, job_inputs)
     p.close()
     return result
-
-if __name__=="__main__":
-    def expensive_sum(args):
-        # do some random work
-        _ = [random.randint(0,100) for _ in range(100000)]
-        return sum(args)
-
-    print scheduler(expensive_sum, [(i, i+1) for i in range(100)])

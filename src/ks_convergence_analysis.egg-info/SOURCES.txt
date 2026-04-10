@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+setup.cfg
+setup.py
+src/ks_convergence_analysis/__init__.py
+src/ks_convergence_analysis/convergence_analysis.py
+src/ks_convergence_analysis.egg-info/PKG-INFO
+src/ks_convergence_analysis.egg-info/SOURCES.txt
+src/ks_convergence_analysis.egg-info/dependency_links.txt
+src/ks_convergence_analysis.egg-info/requires.txt
+src/ks_convergence_analysis.egg-info/top_level.txt
+src/ks_convergence_analysis/helpers/__init__.py
+src/ks_convergence_analysis/helpers/misc.py
+src/ks_convergence_analysis/helpers/plot.py
+src/ks_convergence_analysis/helpers/scheduler.py

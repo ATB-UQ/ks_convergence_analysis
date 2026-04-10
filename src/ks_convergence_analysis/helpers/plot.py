@@ -1,6 +1,4 @@
 import matplotlib
-matplotlib.use("Agg")
-from matplotlib.gridspec import GridSpec
 import pylab
 import numpy as np
 
@@ -18,10 +16,12 @@ FONT_PARAMS = dict(
     size=12,
     )
 
+
 def create_figure(figsize=(6.5, 5)):
     fig = pylab.figure(figsize=figsize)
     fig.hold = True
     return fig
+
 
 def save_figure(fig, fig_name, image_format=None, dpi=300, transpatent=False):
     if "." in fig_name and image_format is None:
@@ -34,7 +34,7 @@ def save_figure(fig, fig_name, image_format=None, dpi=300, transpatent=False):
     else:
         file_name = fig_name
     fig.tight_layout()
-    fig.savefig(file_name, dpi=dpi, format=image_format, transpatent=transpatent)
+    fig.savefig(file_name, dpi=dpi, format=image_format)#, transpatent=transpatent)
     pylab.close(fig)
 
 def plot_figure(x, y, t_exclude, ks_values, equilibration_time, time_below_threshold, convergence_criteria, step_size, ax_ks, ax_summary, show_analysis=False, se_fit=None):
@@ -43,7 +43,7 @@ def plot_figure(x, y, t_exclude, ks_values, equilibration_time, time_below_thres
     if se_fit is not None:
         # se_fit is undefined at 0
         ax_ks.plot(t_exclude[-len(se_fit):], se_fit, linestyle='--',color="g",marker ='', label="$SE_{fit}$", linewidth=1.2, zorder=4)
-    ax_ks.plot([0, max(t_exclude)], [convergence_criteria, convergence_criteria], dashes=(1,1), color="K", zorder=3)
+    ax_ks.plot([0, max(t_exclude)], [convergence_criteria, convergence_criteria], dashes=(1,1), color="k", zorder=3)
     ax_ks.set_ylabel("$KS_{SE}$")
     ax_ks.set_xlabel("$t_{excl}$ (ps)")
     #ax_ks.set_xlabel("N")

@@ -1,8 +1,7 @@
 import numpy as np
 import pickle
 import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from scipy.stats.mstats_basic import linregress
 
 from ks_convergence_analysis.helpers.scheduler import scheduler

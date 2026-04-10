@@ -1,26 +1,19 @@
+from matplotlib.gridspec import GridSpec
 from scipy.optimize import curve_fit
 from scipy.stats.stats import ks_2samp
 import numpy as np
 import argparse
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-try:
-    from ks_convergence_analysis.helpers.plot import plot_figure, create_figure, GridSpec, save_figure
-    CAN_PLOT = True
-except ImportError as e:
-    CAN_PLOT = False
-    print "An error occurred while importing helpers.plot, plotting will be disabled: {0}".format(e)
-
+from ks_convergence_analysis.helpers.plot import plot_figure, create_figure, save_figure
 from ks_convergence_analysis.helpers.scheduler import scheduler
 from ks_convergence_analysis.helpers.misc import value_to_closest_index, sloppy_data_parser, round_sigfigs
 
 DEFAULT_FIGURE_NAME = "ks_convergence.png"
 SIGFIGS = 3
 
+
 def find_min_point(block_ks_vals, block_test_region_sizes, value_discretisation):
-    # Eue to the noise and flatness of curve values will be sorted based on
+    # Due to the noise and flatness of curve values will be sorted based on
     # discrete bound determined by the value_discretisation variable.
     # i.e. from 0, steps with increment value_discretisation will be used to
     # discretize block_ks_vals when sorting. Then secondary sort is on distance
@@ -32,6 +25,7 @@ def find_min_point(block_ks_vals, block_test_region_sizes, value_discretisation)
 
     return sorted(zip(block_ks_vals, block_test_region_sizes), key=sort_func)[0]
 
+
 def test_multiple_regions(x, y, step_index, multithread, verbose=True):
     # length of test regions, ensure all value are considered by starting from len(x)
     region_indexes = np.arange(0, len(x), step_index)
@@ -41,6 +35,7 @@ def test_multiple_regions(x, y, step_index, multithread, verbose=True):
     ks_vals = run_ks_2samp_for_all(region_indexes, y, multithread=multithread, verbose=verbose)
 
     return t_exclude, ks_vals
+
 
 def run_ks_2samp_for_all(region_indexes, y, multithread=False, verbose=True):
 
@@ -69,6 +64,7 @@ def run_ks_se_analysis(x, y, step_size_in_percent, nsigma, converged_error_thres
     #ks_se_fit = ks_error_estimates
     return ks_se_fit, ks_error_estimates, t_exclude, t_exclude[equilibration_time_index]
 
+
 def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1,
     equilibration_region_tolerance=0.3, multithread=True, produce_figure=True, axes=None, verbose=True):
 
@@ -87,17 +83,15 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
     else:
         time_below_threshold = 0
 
-    if CAN_PLOT and produce_figure and axes is None:
+    if axes is None and produce_figure:
         fig = create_figure(figsize=(3.5, 4.0))
         gs = GridSpec(3, 1)
         ax_summary = fig.add_subplot(gs[0,0])
         ax_ks = fig.add_subplot(gs[1:3,0])
     else:
-        if not CAN_PLOT:
-            print "Cannot generate plot"
         fig = None
-        ax_ks = None
         ax_summary = None
+        ax_ks = None
 
     if axes is not None:
         assert len(axes) == 2, "A list of two axes must be provided"
@@ -109,6 +103,7 @@ def ks_convergence_analysis(x, y, converged_error_threshold, step_size_in_percen
 
     return ks_err_est, equilibration_time, time_below_threshold, entire_enseble_error_est, fig
 
+
 def fit_se_model(t_exclude, ks_error_estimates, std_y, equilibration_time_index):
     def f_se(x, a):
         return a/np.sqrt(x)
@@ -116,43 +111,48 @@ def fit_se_model(t_exclude, ks_error_estimates, std_y, equilibration_time_index)
     # need to start at 1 due to f_se not being defined for 0
     t_exclude_truncation_index = None if equilibration_time_index == 0 else -equilibration_time_index
 
-    fitted_params, _ = curve_fit(f_se, t_exclude[1:t_exclude_truncation_index], ks_error_estimates[equilibration_time_index:-1][::-1], p0=[std_y])
-    return fitted_params, f_se(t_exclude[1:t_exclude_truncation_index], *fitted_params)[::-1]
+    curve_fit_return = curve_fit(f_se, t_exclude[1:t_exclude_truncation_index],
+                              ks_error_estimates[equilibration_time_index:-1][::-1], p0=[std_y])
+    fitted_params = curve_fit_return[0]
+    return fitted_params, f_se(t_exclude[1:t_exclude_truncation_index], fitted_params)[::-1]
+
 
 def ks_test(x):
-    test_values, ref_values = x[:len(x)/2], x[len(x)/2:]
+    test_values, ref_values = x[:int(len(x)/2)], x[int(len(x)/2):]
     return ks_2samp(test_values, ref_values)[0]
+
 
 def process_plot_argument(args):
     figure_name = DEFAULT_FIGURE_NAME if args.plot is None else args.plot
-    figure_name = False if figure_name == CAN_PLOT else figure_name
     figure_name = "{0}.png".format(figure_name) if (figure_name and "." not in figure_name) else figure_name
     return figure_name
+
 
 def print_results(xs, ks_err_est, equilibration_time, time_below_threshold, entire_enseble_error_est, sigfigs=SIGFIGS, title=None):
     round_sf = lambda x:round_sigfigs(x, sigfigs)
     if title is not None:
-        print
-        print title
-    print "Equilibration time: {0:g} ps".format(round_sf(equilibration_time))
+        print(title)
+    print("Equilibration time: {0:g} ps".format(round_sf(equilibration_time)))
     equilibrium_sampling_length = xs[-1] - equilibration_time
-    print "Equilibrium sampling length: {0:g} ps".format(round_sf(equilibrium_sampling_length))
+    print("Equilibrium sampling length: {0:g} ps".format(round_sf(equilibrium_sampling_length)))
 
-    print "Convergence robustness: {0:g}".format(round_sf(time_below_threshold / (equilibrium_sampling_length - time_below_threshold)))
-    print "Entire ensemble KS error estimate: {0:g}".format(round_sf(entire_enseble_error_est))
-    print "Fitted KS error estimate: {0:g}".format(round_sf(ks_err_est))
+    print("Convergence robustness: {0:g}".format(round_sf(time_below_threshold / (equilibrium_sampling_length - time_below_threshold))))
+    print("Entire ensemble KS error estimate: {0:g}".format(round_sf(entire_enseble_error_est)))
+    print("Fitted KS error estimate: {0:g}".format(round_sf(ks_err_est)))
+
 
 def run(xs, ys, target_error, figure_name, sigfigs, verbose):
 
     ks_err_est, equilibration_time, time_below_threshold, entire_enseble_error_est, fig = \
         ks_convergence_analysis(xs, ys, target_error, verbose=verbose)
 
-    if fig and figure_name and CAN_PLOT:
+    if fig and figure_name:
         fig.tight_layout()
         save_figure(fig, figure_name)
     if verbose:
         print_results(xs, ks_err_est, equilibration_time, time_below_threshold, entire_enseble_error_est, sigfigs=sigfigs)
-    print "{0:g}".format(round_sigfigs(ks_err_est, sigfigs))
+    print("{0:g}".format(round_sigfigs(ks_err_est, sigfigs)))
+
 
 def parse_args():
     argparser = argparse.ArgumentParser()
@@ -160,7 +160,7 @@ def parse_args():
                         help="File containing data to integrate. Lines are read as whitespace separated values of the form: <x> <y>.")
     argparser.add_argument('-t', '--target_error', type=float, required=True,
                         help="Target error.")
-    argparser.add_argument('-p', '--plot', nargs='?', type=str, default=CAN_PLOT,
+    argparser.add_argument('-p', '--plot', nargs='?', type=str, default=True,
                         help="Show plot of integration errors, requires matplotlib. Optional argument will determine where and in what format the figure will be saved in.")
     argparser.add_argument('-s', '--sigfigs', type=int, default=SIGFIGS,
                         help="Number of significant figures in output. Default=3")
@@ -173,9 +173,11 @@ def parse_args():
 
     return xs, ys, args.target_error, figure_name, args.sigfigs, args.verbose
 
+
 def main():
     xs, ys, target_error, figure_name, sigfigs, verbose = parse_args()
     run(xs, ys, target_error, figure_name, sigfigs, verbose)
+
 
 if __name__=="__main__":
     main()

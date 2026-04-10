@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def round_sigfigs(num, sig_figs):
     """Round to specified number of sigfigs.
 
@@ -25,12 +26,14 @@ def round_sigfigs(num, sig_figs):
     else:
         return 0  # Can't take the log of 0
 
+
 def value_to_closest_index(x, x1):
     '''Return the index of x which is closest to the value x1'''
     if len(x) < 2 or x1 < (x[1] - x[0]):
         return 0
     # return the index of the first value that is >= x1
     return np.argmax(np.array(x)>=x1)
+
 
 def sloppy_data_parser(file_name):
     with open(file_name) as fh:
