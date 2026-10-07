@@ -1,46 +1,55 @@
------------------------------------
-Kolmogorov-Smirnov (KS) Time Series Average Convergence
------------------------------------
+# ks_convergence_analysis
 
-A tool to analyse the convergence properties of an average calculated from time series data.
+Kolmogorov-Smirnov analysis of the convergence of a time-series average: for each candidate
+equilibration cut, a two-sample KS test between the halves of the remaining series gives an error
+estimate, from which the equilibration time, the error of the average and the time needed to get
+below a target error are derived. Method write-up: `method_summary.pdf`.
+Author: Martin Stroet (University of Queensland). Licence: `LICENSE`.
 
-Author: Martin Stroet (University of Queensland)
+Status: live-support library (imported by `gromos_job_wrapper` and `atb_condensed_phase`); the
+method is stable, the package itself is untouched since its Python 3 conversion.
 
----------------------
-Requirements
-----------------------
+## Install
 
-    Python 2.7
-    scipy
-    numpy
+Python 3; `numpy`, `scipy`, `matplotlib` (see `setup.cfg`). Installed editable in the platform venv
+`/home/atb/ATB/.venv`; elsewhere `pip install -e .`. No env vars, hosts or vendor binaries.
 
-Optional
+## Python API
 
-    matplotlib (show plots)
+```python
+from ks_convergence_analysis.convergence_analysis import ks_convergence_analysis
+err, t_equil, t_below, err_all, fig = ks_convergence_analysis(
+    x, y, converged_error_threshold, step_size_in_percent=1, nsigma=1,
+    multithread=False, produce_figure=False)
+```
+Returns the KS error estimate after discarding equilibration, the equilibration time (in `x`
+units), the time after which the error is below the threshold (0 if already below at the start),
+the error estimate for the whole series, and a figure (or `None`). `multithread=True` (the default)
+uses a `multiprocessing.Pool`; pass `False` on shared hosts. `axes=[ax_summary, ax_ks]` plots
+into existing axes.
 
---------------------
-Usage
---------------------
+## Command line
 
-    python convergence_analysis.py [-h] -d DATA -t TARGET_ERROR [-p [PLOT]]
-                                   [-s SIGFIGS] [-v]
+No console script is installed:
 
-    arguments:
-      -h, --help            show this help message and exit
-      -d DATA, --data DATA  File containing data to integrate. Lines are read as
-                            whitespace separated values of the form: <x> <y>.
-      -t TARGET_ERROR, --target_error TARGET_ERROR
-                            Target error.
-      -p [PLOT], --plot [PLOT]
-                            Show plot of integration errors, requires matplotlib.
-                            Optional argument will determine where and in what
-                            format the figure will be saved in.
-      -s SIGFIGS, --sigfigs SIGFIGS
-                            Number of significant figures in output. Default=3
-      -v, --verbose         Print details.
+```bash
+python -m ks_convergence_analysis.convergence_analysis -d DATA -t TARGET_ERROR [-p [PLOT]] [-s SIGFIGS] [-v]
+```
+`DATA` is two whitespace-separated columns `x y` (`#`/`@` comment lines skipped, GROMACS `.xvg`
+style). `-p` saves a figure (default name `ks_convergence.png`). Stdout ends with the error
+estimate. Example data and calls: `src/ks_convergence_analysis/example/example.sh` and
+`src/ks_convergence_analysis/test/data/` (the script's relative paths assume you run it from a
+checkout layout without `src/`; adapt to the `python -m` form above).
 
-----------------------------
-Example
-----------------------------
+## Platform fit
 
-For example use of this tool see example/example.sh
+Used by `gromos_job_wrapper` (`helpers/data_processing.py`, KS error analysis) and
+`atb_condensed_phase` (`analysis/estimators.py`, equilibration discard). It imports no in-house
+package itself; `block_averaging` and `mspyplot` appear only in `test/extended_tests.py`.
+
+## Tests
+
+`src/ks_convergence_analysis/test/test.py` and `extended_tests.py` are scripts that regenerate
+figures (`*.png` beside them) and compare against block averaging; they are not assertion suites
+and `extended_tests.py` needs uninstalled `red_noise`, `image_concat` and `mspyplot`. There is no
+pytest suite.
