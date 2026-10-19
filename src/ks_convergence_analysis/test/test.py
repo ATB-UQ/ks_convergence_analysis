@@ -1,8 +1,22 @@
+import os
+import tempfile
+
 import numpy as np
 from matplotlib.gridspec import GridSpec
 
 from ks_convergence_analysis.convergence_analysis import ks_convergence_analysis, print_results
 from ks_convergence_analysis.helpers.plot import save_figure, create_figure
+
+
+# Figures go to a scratch directory, never the working directory: this directory
+# holds tracked reference PNGs (convergence_heuristic, dvdl, equilibration_examples)
+# that running from here used to overwrite (review G10). Set KS_TEST_OUTDIR to keep them.
+OUT_DIR = os.environ.get("KS_TEST_OUTDIR") or tempfile.mkdtemp(prefix="ks_convergence_test_")
+
+
+def out_path(name):
+    os.makedirs(OUT_DIR, exist_ok=True)
+    return os.path.join(OUT_DIR, name)
 
 
 def sloppy_data_parser(file_name):
@@ -17,7 +31,7 @@ def run(x, y, target_error, name=None, nsigma=1, axes=None):
 
     if name is not None and fig is not None and axes is None:
         fig.tight_layout()
-        save_figure(fig, name)
+        save_figure(fig, out_path(name))
     print_results(x, ks_err_est, equilibration_time, time_below_threshold, entire_enseble_error_est, title=name)
     return equilibration_time, time_below_threshold, fig
 
@@ -49,7 +63,7 @@ def equilibration_examples(data_file_no_equilibration, data_file_equilibration):
     ax_summary_d.set_ylabel("$P\\ (\\mathrm{atm})$")
 
     fig.tight_layout()
-    save_figure(fig, "equilibration_examples")
+    save_figure(fig, out_path("equilibration_examples"))
 
 
 def convergence_heuristic(data_file_converged, data_file_not_converged):
@@ -96,7 +110,7 @@ def convergence_heuristic(data_file_converged, data_file_not_converged):
     ax_summary_d.set_ylabel("")
     ax_ks_d.set_ylim(ylims)
     #ax_d.invert_xaxis()
-    save_figure(fig, "convergence_heuristic")
+    save_figure(fig, out_path("convergence_heuristic"))
 
 
 if __name__=="__main__":
