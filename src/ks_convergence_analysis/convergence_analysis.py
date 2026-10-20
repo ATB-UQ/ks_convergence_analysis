@@ -6,7 +6,7 @@ import argparse
 
 from ks_convergence_analysis.helpers.plot import plot_figure, create_figure, save_figure
 from ks_convergence_analysis.helpers.scheduler import scheduler
-from ks_convergence_analysis.helpers.misc import value_to_closest_index, sloppy_data_parser, round_sigfigs
+from trapz_errors.helpers import value_to_closest_index, sloppy_data_parser, round_sigfigs
 
 DEFAULT_FIGURE_NAME = "ks_convergence.png"
 SIGFIGS = 3

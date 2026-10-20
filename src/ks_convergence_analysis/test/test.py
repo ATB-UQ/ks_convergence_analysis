@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 
 from ks_convergence_analysis.convergence_analysis import ks_convergence_analysis, print_results
+from trapz_errors.helpers import sloppy_data_parser
 from ks_convergence_analysis.helpers.plot import save_figure, create_figure
 
 
@@ -17,12 +18,6 @@ OUT_DIR = os.environ.get("KS_TEST_OUTDIR") or tempfile.mkdtemp(prefix="ks_conver
 def out_path(name):
     os.makedirs(OUT_DIR, exist_ok=True)
     return os.path.join(OUT_DIR, name)
-
-
-def sloppy_data_parser(file_name):
-    with open(file_name) as fh:
-        xs, ys = zip(*[map(float, l.split()) for l in fh.read().splitlines() if l and not l[0] in ["#", "@"] and len(l.split()) == 2])
-    return np.array(xs), np.array(ys)
 
 
 def run(x, y, target_error, name=None, nsigma=1, axes=None):

@@ -2,7 +2,7 @@ import matplotlib
 import pylab
 import numpy as np
 
-from ks_convergence_analysis.helpers.misc import value_to_closest_index
+from trapz_errors.helpers import value_to_closest_index
 
 matplotlib.rc("mathtext", fontset="stix")
 
